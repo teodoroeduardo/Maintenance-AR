@@ -4,6 +4,7 @@ import io
 import os
 import random as rnd
 import pandas as pd
+import time
 import datetime as dt
 import dash
 import plotly.graph_objects as go 
@@ -186,8 +187,17 @@ def update_rpm_gauge (interval):
 
     X = rnd.randrange(999,1101,1)
     traces = gaugue_figure.update_traces(value=X,selector=dict(type='indicator'))
-    return traces
 
+    now = dt.datetime.now()
+    now_str = now.strftime("%d-%m-%Y %H:%M:%S")
+
+    if X <= 1005 or X >= 1090:
+        data = {"Velocidade":X,"Turno":"A","Operador":"Eduardo"}
+        from pages.db import Setup
+        Setup.db.child("Logs").child("Máquina 1").child("LogVelocidade").child(now_str).set(data)               
+ 
+    return traces
+    
 def parse_contents(contents,filename,date):
     content_type,content_string = contents.split(',')
     decoded = base64.b64decode(content_string)

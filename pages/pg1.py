@@ -23,11 +23,11 @@ X.append(1)
 
 checklist_modal_layout = dbc.Modal([
     dbc.ModalHeader(dbc.ModalTitle("CHECKLIST 5S",id="modal-title")),
-    dbc.ModalBody(html.Iframe(src="assets/check1.pdf",width="100%",height="100%")),
+    dbc.ModalBody(id="modal-body",),
     dbc.ModalFooter("Última atualização:")
 ],id="modal-fs",fullscreen=True)
 
-tab1_layout = html.Div([
+tab2_layout = html.Div([
     dbc.Label("Tipo de documento"),
     dbc.RadioItems(options=[
         {"label":"Checklist", "value":1},
@@ -40,8 +40,7 @@ tab1_layout = html.Div([
     dcc.Upload(
         id='upload-data',
         children=html.Div([
-            "Arraste e solte ou",
-            html.A(" selecione o arquivo")
+            "Arraste e solte ou",html.A(" selecione o arquivo")
         ]),
         style={
             "width":"100%",
@@ -54,7 +53,28 @@ tab1_layout = html.Div([
             "margin":"10px"
         },multiple=True
     )
-],className="overflow-scroll")
+])
+
+tab1_layout = html.Div([
+    dbc.Accordion([
+        dbc.AccordionItem([dbc.ListGroup([
+            dbc.ListGroupItem("DIÁRIO DE TURNO", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("NÃO CONFORMIDADE", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("PARADA NÃO PROGRAMADA", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("PARADA PROGRAMADA", id="",action=True, n_clicks=0),
+        ])],title="EMISSÃO DE RELATÓRIOS"),
+        dbc.AccordionItem([dbc.ListGroup([
+            dbc.ListGroupItem("LOGS DE MÁQUINAS", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("CONSUMO DE INSUMOS", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("LISTA DE COMPRAS", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("DIÁRIOS DE TURNO", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("NÃO CONFORMIDADES", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("PARADAS NÃO PROGRAMADAS", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("PARADAS PROGRAMADAS", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("FECHAMENTO MENSAL", id="",action=True, n_clicks=0),
+        ])],title="IMPRESSÃO DE RELATÓRIOS"),
+    ],start_collapsed=True)
+])
 
 card_OEE = [
     dbc.CardBody([
@@ -108,7 +128,7 @@ checklist_layout = html.Div([
             dbc.ListGroupItem("PARTIDA APÓS PARADA POR ENTUPIMENTO VÁLVULA X",id="check4",action=True,n_clicks=0),
             dbc.ListGroupItem("PARTIDA APÓS QUEDA DE ENERGIA",id="check5",action=True,n_clicks=0),
             ])],
-            title="CHECKLIST PÓS-ANOMALIA"),
+            title="CHECKLIST SINISTROS"),
         dbc.AccordionItem([dbc.ListGroup([
             dbc.ListGroupItem("PARTIDA APÓS PARADA PROGRAMADA",id="check6",action=True,n_clicks=0),
             dbc.ListGroupItem("PARTIDA APÓS TROCA DE ROLAMENTO DO REDUTOR",id="check7",action=True,n_clicks=0),
@@ -118,22 +138,23 @@ checklist_layout = html.Div([
             dbc.ListGroupItem("CHECKLIST 120H",id="check8",action=True,n_clicks=0),
             dbc.ListGroupItem("CHECKLIST 720H",id="check9",action=True,n_clicks=0),
             dbc.ListGroupItem("CHECKLIST 6 MESES",id="check10",action=True,n_clicks=0),
-            dbc.ListGroupItem("CHECKLIST 12 MESES",id="check11",action=True,n_clicks=0),
-            
+            dbc.ListGroupItem("CHECKLIST 12 MESES",id="check11",action=True,n_clicks=0),            
             ])],
-            title="CHECKLIST PREDITIVA"),                        
+            title="CHECKLIST PREDITIVA"),
+        dbc.AccordionItem([dbc.ListGroup([
+            dbc.ListGroupItem("MANUAL MOTOREDUTOR WEG 10HP",id="check12",action=True,n_clicks=0),
+            dbc.ListGroupItem("MANUAL MOTOR WEG 20HP",id="check13",action=True,n_clicks=0),
+            dbc.ListGroupItem("MANUAL GERADOR NEMA 800Kva ",id="check14",action=True,n_clicks=0),           
+            ])],
+            title="MANUAIS"),                                
     ],start_collapsed=True,)
 
 ])
 
 relatorios_layout = html.Div([
     dbc.Tabs([
-        dbc.Tab(label="Aba 1",),
-        dbc.Tab(tab1_layout,label="Aba 2"),
-        dbc.Tab(label="Aba 3"),
-        dbc.Tab(label="Aba 4"),
-        dbc.Tab(label="Aba 5"),
-        dbc.Tab(label="Aba 6"),
+        dbc.Tab(tab1_layout,label="Relatórios",),
+        dbc.Tab(tab2_layout,label="Upload Documentos"),
     ])
 ])
 
@@ -194,7 +215,7 @@ def update_rpm_gauge (interval):
     if X <= 1005 or X >= 1090:
         data = {"Velocidade":X,"Turno":"A","Operador":"Eduardo"}
         from pages.db import Setup
-        Setup.db.child("Logs").child("Máquina 1").child("LogVelocidade").child(now_str).set(data)               
+        #Setup.db.child("Logs").child("Máquina 1").child("LogVelocidade").child(now_str).set(data)               
  
     return traces
     
@@ -241,11 +262,26 @@ def update_output(list_of_contents, list_of_names, list_of_dates):
 @callback(
     Output("modal-fs", "is_open"),
     Input("check1", "n_clicks"),
-    Input("check2", "n_clicks"),
+    Input("check12", "n_clicks"),
     State("modal-fs", "is_open"),
 )
-def toggle_modal(check1,check2, is_open):
+def toggle_modal(check1,check12, is_open):
     btn_id = ctx.triggered_id if not None else 'Sem clicks'
 
+    if ctx.triggered_id == "check1" or ctx.triggered_id == "check12":
+        return is_open,
+
+@callback(Output("modal-body","children"),
+[Input("check1", "n_clicks"),
+Input("check12", "n_clicks")])
+def modal_content(check1,check12):  
+
     if ctx.triggered_id == "check1":
-        return is_open, 
+        body = html.Iframe(src="/assets/check1.pdf",height="100%",width="100%")
+        return body
+
+    if ctx.triggered_id == "check12":
+        body = html.Iframe(src="/assets/weg.pdf",height="100%",width="100%")
+        return body        
+
+

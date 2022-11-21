@@ -19,7 +19,7 @@ dropdown_menu = dbc.DropdownMenu([
 
 app.layout = dbc.Container([
     dbc.Row([
-        dbc.Col(html.Div("ISSO É UM TEXTO")),
+        dbc.Col(html.Div("[LOGOS]")),
         dbc.Col(html.Div("ENGENHARIA DE MANUTENÇÃO",style={'fontSize':50,'text-align':'center'})),
         dbc.Col(dropdown_menu),
     ],align="center",className="text-center"),

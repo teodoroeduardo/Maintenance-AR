@@ -7,12 +7,15 @@ import pandas as pd
 import time
 import datetime as dt
 import dash
+import pandas as pd
 import plotly.graph_objects as go 
 from dash import html, dcc, dash_table, callback,ctx
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, State
 from collections import deque
 import dash_bootstrap_components as dbc
+import plotly.express as px
+
 
 dash.register_page(__name__, path='/',title="Utilização de AR nas práticas de Engenharia de Manutenção")
 
@@ -20,6 +23,15 @@ GRAPH_INTERVAL = os.environ.get("GRAPH_INTERVAL", 1000)
 
 X = deque(maxlen=20)
 X.append(1)
+
+modal_relatorio_logs = dbc.Modal([
+    dbc.ModalHeader(dbc.ModalTitle("Relatório Logs de Máquina")),
+    dbc.ModalBody(dcc.Graph(id="relatorio-graph")),
+    dbc.ModalFooter([
+        dbc.Button("Enviar Relatório"),
+        dbc.Button("Download",n_clicks=0,id="download-btn"),
+        dcc.Download(id="relatorio-maquinas-csv")])
+],id="modal-lg",size="xl")
 
 checklist_modal_layout = dbc.Modal([
     dbc.ModalHeader(dbc.ModalTitle("CHECKLIST 5S",id="modal-title")),
@@ -60,11 +72,11 @@ tab1_layout = html.Div([
         dbc.AccordionItem([dbc.ListGroup([
             dbc.ListGroupItem("DIÁRIO DE TURNO", id="",action=True, n_clicks=0),
             dbc.ListGroupItem("NÃO CONFORMIDADE", id="",action=True, n_clicks=0),
-            dbc.ListGroupItem("PARADA NÃO PROGRAMADA", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("PARADA NÃO PROGRAMADA", id="reporte3",action=True, n_clicks=0),
             dbc.ListGroupItem("PARADA PROGRAMADA", id="",action=True, n_clicks=0),
         ])],title="EMISSÃO DE RELATÓRIOS"),
         dbc.AccordionItem([dbc.ListGroup([
-            dbc.ListGroupItem("LOGS DE MÁQUINAS", id="",action=True, n_clicks=0),
+            dbc.ListGroupItem("LOGS DE MÁQUINAS", id="relatorio-1",action=True, n_clicks=0),
             dbc.ListGroupItem("CONSUMO DE INSUMOS", id="",action=True, n_clicks=0),
             dbc.ListGroupItem("LISTA DE COMPRAS", id="",action=True, n_clicks=0),
             dbc.ListGroupItem("DIÁRIOS DE TURNO", id="",action=True, n_clicks=0),
@@ -198,7 +210,8 @@ raw_layout = dbc.Container([
         dbc.Col((relatorios_layout),class_name="shadow p-3 mb-5 bg-white rounded border border-light border rounded-3 overflow-hidden p-3 mb-3 me-sm-3 "),
         dbc.Col((chat_layout),class_name="shadow p-3 mb-5 bg-white rounded border border-light border rounded-3")
     ]),
-    html.Div(checklist_modal_layout)
+    html.Div(checklist_modal_layout),
+    html.Div(modal_relatorio_logs),
 ],fluid=True)
 
 layout = raw_layout
@@ -215,7 +228,7 @@ def update_rpm_gauge (interval):
     if X <= 1005 or X >= 1090:
         data = {"Velocidade":X,"Turno":"A","Operador":"Eduardo"}
         from pages.db import Setup
-        #Setup.db.child("Logs").child("Máquina 1").child("LogVelocidade").child(now_str).set(data)               
+        Setup.db.child("Logs").child("Máquina 1").child("LogVelocidade").child(now_str).set(data)               
  
     return traces
     
@@ -263,18 +276,21 @@ def update_output(list_of_contents, list_of_names, list_of_dates):
     Output("modal-fs", "is_open"),
     Input("check1", "n_clicks"),
     Input("check12", "n_clicks"),
+    Input("reporte3", "n_clicks"),
     State("modal-fs", "is_open"),
 )
-def toggle_modal(check1,check12, is_open):
+def toggle_modal(check1,check12,reporte3, is_open):
     btn_id = ctx.triggered_id if not None else 'Sem clicks'
 
-    if ctx.triggered_id == "check1" or ctx.triggered_id == "check12":
+    if ctx.triggered_id == "check1" or ctx.triggered_id == "check12" or ctx.triggered_id == "reporte3":
         return is_open,
 
 @callback(Output("modal-body","children"),
 [Input("check1", "n_clicks"),
-Input("check12", "n_clicks")])
-def modal_content(check1,check12):  
+Input("check12", "n_clicks"),
+Input("reporte3", "n_clicks"),
+])
+def modal_content(check1,check12,reporte3):  
 
     if ctx.triggered_id == "check1":
         body = html.Iframe(src="/assets/check1.pdf",height="100%",width="100%")
@@ -282,6 +298,91 @@ def modal_content(check1,check12):
 
     if ctx.triggered_id == "check12":
         body = html.Iframe(src="/assets/weg.pdf",height="100%",width="100%")
-        return body        
+        return body
 
+    if ctx.triggered_id == "reporte3":
+        body = html.Div([
+            dbc.Row([
+                dbc.Col([
+                    dbc.Row([html.H4("Relatório de parada não programada")]),
+                    html.Hr(),
+                    dbc.Row([
+                        dbc.Col([
+                            dbc.DropdownMenu(label="Máquina",children=[dbc.DropdownMenuItem("Máquina 1"),dbc.DropdownMenuItem("Máquina n")],id="maquina_id")]),
+                        dbc.Col([
+                            dbc.Row([html.H6("Horário de Parada")]),
+                            dbc.Row([dcc.Input(type='text',id="input_parada")]),
+                        ]),
+                        dbc.Col([
+                            dbc.Row([html.H6("Horário de Partida")]),
+                            dbc.Row([dcc.Input(type='text',id="input_partida")])
+                        ])
+                        ]),
+                    dbc.Row([dbc.Button("Emitir Relatório",id="emitir_relatorio",n_clicks=0)])
+                    ]),
+                dbc.Col([
+                    dbc.Row([html.H4("Histórico de paradas não programadas")]),
+                    html.Hr(),
+                    dbc.Row(dash_table.DataTable(id="output"))
+                    ])
+            ])
+        ],className="text-center")
+        return body              
+
+@callback(Output("output","children"),
+[Input("emitir_relatorio","n_clicks"),
+Input("maquina_id","children"),
+Input("input_parada","value"),
+Input("input_partida","value")])
+
+def output_text(emitir_relatorio,maquina_id,input_parada,input_partida):
+
+    now = dt.datetime.now()
+    now_str = now.strftime("%d-%m-%Y %H:%M:%S")
+
+    if ctx.triggered_id == "emitir_relatorio":
+       
+        data = {"Hora_Parada":input_parada,"Hora_Partida":input_partida}
+
+        from pages.db import Setup
+        Setup.db.child("Relatórios/PNP/Máquina1").child(now_str).set(data)          
+        pass
+
+@callback (Output("modal-lg","is_open"),Input("relatorio-1","n_clicks"),State("modal-lg","is_open"))
+def toggle_modal(n1,is_open):
+    if n1:
+        return not is_open
+    return is_open
+
+
+@callback (
+    Output("relatorio-graph","figure"),
+    Output("relatorio-maquinas-csv","data"),
+    Input("relatorio-1","n_clicks"),
+    Input("download-btn","n_clicks"),
+    prevent_initial_call = True)
+def relatorioLogs(figure,n_clicks):
+    from pages.db import Setup
+
+    lista = Setup().db.child("Logs/Máquina 1/LogVelocidade").get()
+
+    lista1 = []
+    lista2 = []
+
+    for i in lista.each():
+        a = i.key()
+        lista1.append(a)
+
+    df1 = pd.DataFrame(lista1,columns=['Timestamp'])
+
+    for i in lista.each():
+        b = i.val()
+        lista2.append(b)
+
+    df2 = pd.DataFrame(lista2)
+    df3 = pd.concat([df1,df2['Velocidade']],axis=1)
+
+    figure = px.scatter(df3,x='Timestamp',y='Velocidade')
+
+    return figure,dcc.send_data_frame(df3.to_csv,"relatorio_logs.csv")
 
